@@ -16,13 +16,13 @@ import java.util.stream.IntStream;
 
 public class Mandelbrot extends JFrame
 {
-    final int width = 1600;
+    final int width = 960;
     final int height = width;
     final double ratio = (double) width / (double) height;
     final double bailout = 100.0;
 
     final int maxIter = 1 << 18;
-    final int aliasing = 5;
+    final int aliasing = 25;
     final int samples = aliasing * aliasing;
 
     double xCenter, yCenter, radius, gap, miniGap, close, delta;
@@ -99,7 +99,7 @@ public class Mandelbrot extends JFrame
 
         pool.invoke(new Tarea(0, false));
 
-        gfx.drawImage(image, 0, 0, null);
+//        gfx.drawImage(image, 0, 0, null);
 
         System.out.println(System.currentTimeMillis() - time);
 
@@ -238,7 +238,7 @@ public class Mandelbrot extends JFrame
             if (suitable)
             {
                 IntStream.range(0, width).forEach(x -> raster.setPixel(x, y, superPixel(x, y)));
-//                gfx.drawImage(image, 0, 0, null);
+                gfx.drawImage(image, 0, 0, null);
             }
             else
             {
