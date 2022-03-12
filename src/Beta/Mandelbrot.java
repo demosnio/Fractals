@@ -16,13 +16,13 @@ import java.util.stream.IntStream;
 
 public class Mandelbrot extends JFrame
 {
-    final int width = 960;
+    final int width = 1600;
     final int height = width;
     final double ratio = (double) width / (double) height;
     final double bailout = 100.0;
 
     final int maxIter = 1 << 18;
-    final int aliasing = 25;
+    final int aliasing = 5;
     final int samples = aliasing * aliasing;
 
     double xCenter, yCenter, radius, gap, miniGap, close, delta;
@@ -134,7 +134,7 @@ public class Mandelbrot extends JFrame
 
             double m = a + b;
 
-            if (m > bailout) return colorPalette(iter + smoothing(m));
+            if (m > bailout) return colorFunction(iter + smoothing(m));
 
             y = x * y;
             y = y + y + cy;
@@ -157,7 +157,8 @@ public class Mandelbrot extends JFrame
 
     double smoothing(double modulus)
     {
-        return 1.0 + Math.log(Math.log(bailout) / Math.log(modulus)) / Math.log(2.0);
+        //return 1.0 + Math.log(Math.log(bailout) / Math.log(modulus)) / Math.log(2.0);
+        return 1.0 - Math.log(Math.log(modulus)) / Math.log(2.0);
     }
 
     private double[] superPixel(int px, int py)
@@ -201,11 +202,11 @@ public class Mandelbrot extends JFrame
     {
         double[] color = new double[3];
         double speed = 7.1;
+        double s = 1.1;
 
         z *= speed * Math.PI / 180.0;
 
-        double s = Math.PI / 3.0;
-        for (int i = 0; i < 3; i++) color[i] = 127.5 + 127.5 * Math.sin(z + s * (i - 1));
+        for (int i = 0; i < 3; i++) color[i] = 155.0 + 100.0 * Math.sin(z + s * (i - 1));
 
         return color;
     }
@@ -213,12 +214,6 @@ public class Mandelbrot extends JFrame
     private double[] mapping(double start, double end, int steps)
     {
         return IntStream.range(0, steps).parallel().mapToDouble(i -> start + i * (end - start) / (steps - 1.0)).toArray();
-    }
-
-    public static void main(String[] args)
-    {
-        new Mandelbrot(-0.765, 0.0, 1.28);
-//        new Mandelbrot(0.0, 0.0, 1.53, -0.74543, 0.11301);
     }
 
     class Tarea extends RecursiveAction
