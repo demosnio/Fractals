@@ -11,12 +11,15 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
 import java.util.stream.IntStream;
 
 public class Mandelbrot extends JFrame
 {
-    final int width = 1600;
+    final int threshold = 1 << 6;
+
+    final int width = threshold << 5;
     final int height = width;
     final double ratio = (double) width / (double) height;
     final double bailout = 100.0;
@@ -97,7 +100,11 @@ public class Mandelbrot extends JFrame
 
         long time = System.currentTimeMillis();
 
-        pool.invoke(new Tarea(0, false));
+//        pool.invoke(new LinesTask(0, false));
+
+        pool.invoke(new AreaTask(0, 0, width, height, false));
+
+//        pool.invoke(new RecursiveAreaTask(0, 0, width, height));
 
 //        gfx.drawImage(image, 0, 0, null);
 
@@ -216,12 +223,12 @@ public class Mandelbrot extends JFrame
         return IntStream.range(0, steps).parallel().mapToDouble(i -> start + i * (end - start) / (steps - 1.0)).toArray();
     }
 
-    class Tarea extends RecursiveAction
+    class LinesTask extends RecursiveAction
     {
         boolean suitable;
         int y;
 
-        public Tarea(int y, boolean suitable)
+        public LinesTask(int y, boolean suitable)
         {
             this.y = y;
             this.suitable = suitable;
@@ -237,9 +244,81 @@ public class Mandelbrot extends JFrame
             }
             else
             {
-                List<Tarea> tareas = new ArrayList<>();
-                IntStream.range(0, height).forEach(y -> tareas.add(new Tarea(y, true)));
-                invokeAll(tareas);
+                List<LinesTask> tasks = new ArrayList<>();
+                IntStream.range(0, height).forEach(y -> tasks.add(new LinesTask(y, true)));
+                invokeAll(tasks);
+            }
+        }
+    }
+
+    class AreaTask extends RecursiveAction
+    {
+        boolean suitable;
+        int x, y, width, height;
+
+        public AreaTask(int x, int y, int width, int height, boolean suitable)
+        {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.suitable = suitable;
+        }
+
+        @Override
+        public void compute()
+        {
+            if (suitable)
+            {
+                IntStream.range(x, x + width).forEach(p -> IntStream.range(y, y + height).forEach(q -> raster.setPixel(p, q, superPixel(p, q))));
+                gfx.drawImage(image, 0, 0, null);
+            }
+            else
+            {
+                List<AreaTask> tasks = new ArrayList<>();
+
+                for (int w = 0; w < width; w += threshold)
+                    for (int h = 0; h < height; h += threshold)
+                        tasks.add(new AreaTask(w, h, threshold, threshold, true));
+
+                invokeAll(tasks);
+            }
+        }
+    }
+
+    class RecursiveAreaTask extends RecursiveAction
+    {
+        int x, y, width, height;
+
+        public RecursiveAreaTask(int x, int y, int width, int height)
+        {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+        }
+
+        @Override
+        public void compute()
+        {
+            if (width <= threshold)
+            {
+                IntStream.range(x, x + width).forEach(p -> IntStream.range(y, y + height).forEach(q -> raster.setPixel(p, q, superPixel(p, q))));
+                gfx.drawImage(image, 0, 0, null);
+            }
+            else
+            {
+                int w2 = width >> 1;
+                int h2 = height >> 1;
+
+                List<RecursiveAreaTask> tasks = new ArrayList<>();
+
+                tasks.add(new RecursiveAreaTask(x, y, w2, h2));
+                tasks.add(new RecursiveAreaTask(x, y + h2, w2, h2));
+                tasks.add(new RecursiveAreaTask(x + w2, y, w2, h2));
+                tasks.add(new RecursiveAreaTask(x + w2, y + h2, w2, h2));
+
+                invokeAll(tasks);
             }
         }
     }
