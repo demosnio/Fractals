@@ -12,14 +12,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
 import java.util.stream.IntStream;
 
 public class Mandelbrot extends JFrame
 {
-    final int threshold = 1 << 6;
+    final int threshold = 1 << 7;
 
-    final int width = threshold << 5;
+    final int width = threshold << 4;
     final int height = width;
     final double ratio = (double) width / (double) height;
     final double bailout = 100.0;
@@ -100,11 +101,7 @@ public class Mandelbrot extends JFrame
 
         long time = System.currentTimeMillis();
 
-//        pool.invoke(new LinesTask(0, false));
-
-        pool.invoke(new AreaTask(0, 0, width, height, false));
-
-//        pool.invoke(new RecursiveAreaTask(0, 0, width, height));
+        pool.invoke(new Task(0, 0, width, height, true));
 
 //        gfx.drawImage(image, 0, 0, null);
 
@@ -134,6 +131,8 @@ public class Mandelbrot extends JFrame
         int cycle = 1;
         int test = cycle;
 
+        double e = 0.0;
+
         for (int iter = 0; iter < maxIter; iter++)
         {
             double a = x * x;
@@ -141,7 +140,10 @@ public class Mandelbrot extends JFrame
 
             double m = a + b;
 
-            if (m > bailout) return colorFunction(iter + smoothing(m));
+            e += Math.exp(-m);
+
+            if (m > bailout) return colorFunction(e);
+//            if (m > bailout) return colorFunction(iter + smoothing(m));
 
             y = x * y;
             y = y + y + cy;
@@ -164,7 +166,6 @@ public class Mandelbrot extends JFrame
 
     double smoothing(double modulus)
     {
-        //return 1.0 + Math.log(Math.log(bailout) / Math.log(modulus)) / Math.log(2.0);
         return 1.0 - Math.log(Math.log(modulus)) / Math.log(2.0);
     }
 
@@ -223,102 +224,37 @@ public class Mandelbrot extends JFrame
         return IntStream.range(0, steps).parallel().mapToDouble(i -> start + i * (end - start) / (steps - 1.0)).toArray();
     }
 
-    class LinesTask extends RecursiveAction
+    class Task extends RecursiveAction
     {
-        boolean suitable;
-        int y;
-
-        public LinesTask(int y, boolean suitable)
-        {
-            this.y = y;
-            this.suitable = suitable;
-        }
-
-        @Override
-        public void compute()
-        {
-            if (suitable)
-            {
-                IntStream.range(0, width).forEach(x -> raster.setPixel(x, y, superPixel(x, y)));
-                gfx.drawImage(image, 0, 0, null);
-            }
-            else
-            {
-                List<LinesTask> tasks = new ArrayList<>();
-                IntStream.range(0, height).forEach(y -> tasks.add(new LinesTask(y, true)));
-                invokeAll(tasks);
-            }
-        }
-    }
-
-    class AreaTask extends RecursiveAction
-    {
-        boolean suitable;
+        boolean distribute;
         int x, y, width, height;
 
-        public AreaTask(int x, int y, int width, int height, boolean suitable)
+        public Task(int x, int y, int width, int height, boolean distribute)
         {
             this.x = x;
             this.y = y;
             this.width = width;
             this.height = height;
-            this.suitable = suitable;
+            this.distribute = distribute;
         }
 
         @Override
         public void compute()
         {
-            if (suitable)
+            if (distribute)
             {
-                IntStream.range(x, x + width).forEach(p -> IntStream.range(y, y + height).forEach(q -> raster.setPixel(p, q, superPixel(p, q))));
-                gfx.drawImage(image, 0, 0, null);
-            }
-            else
-            {
-                List<AreaTask> tasks = new ArrayList<>();
+                List<Task> tasks = new ArrayList<>();
 
                 for (int w = 0; w < width; w += threshold)
                     for (int h = 0; h < height; h += threshold)
-                        tasks.add(new AreaTask(w, h, threshold, threshold, true));
+                        tasks.add(new Task(w, h, threshold, threshold, false));
 
                 invokeAll(tasks);
-            }
-        }
-    }
-
-    class RecursiveAreaTask extends RecursiveAction
-    {
-        int x, y, width, height;
-
-        public RecursiveAreaTask(int x, int y, int width, int height)
-        {
-            this.x = x;
-            this.y = y;
-            this.width = width;
-            this.height = height;
-        }
-
-        @Override
-        public void compute()
-        {
-            if (width <= threshold)
-            {
-                IntStream.range(x, x + width).forEach(p -> IntStream.range(y, y + height).forEach(q -> raster.setPixel(p, q, superPixel(p, q))));
-                gfx.drawImage(image, 0, 0, null);
             }
             else
             {
-                int w2 = width >> 1;
-                int h2 = height >> 1;
-
-                List<RecursiveAreaTask> tasks = new ArrayList<>();
-
-                tasks.add(new RecursiveAreaTask(x, y, w2, h2));
-                tasks.add(new RecursiveAreaTask(x, y + h2, w2, h2));
-                tasks.add(new RecursiveAreaTask(x + w2, y, w2, h2));
-                tasks.add(new RecursiveAreaTask(x + w2, y + h2, w2, h2));
-
-                invokeAll(tasks);
+                IntStream.range(x, x + width).forEach(p -> IntStream.range(y, y + height).forEach(q -> raster.setPixel(p, q, superPixel(p, q))));
+                gfx.drawImage(image, 0, 0, null);
             }
         }
     }
