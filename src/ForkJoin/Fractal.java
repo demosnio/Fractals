@@ -2,9 +2,9 @@ package ForkJoin;
 
 public class Fractal
 {
-    final static int THRESHOLD = 256;
-    final static int width = THRESHOLD << 3;
-    final static int height = THRESHOLD << 3;
+    final static int THRESHOLD = 100;
+    final static int width = THRESHOLD * 16;
+    final static int height = THRESHOLD * 9;
 
     final int MAX_ITER = 1 << 16;
     final double BAILOUT = 1.0e6;
