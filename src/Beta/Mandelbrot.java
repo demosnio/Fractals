@@ -17,7 +17,7 @@ import java.util.stream.IntStream;
 
 public class Mandelbrot extends JFrame
 {
-    final int threshold = 240;
+    final int threshold = 200;
 
     final int width = threshold * 16;
     final int height = threshold * 9;
@@ -27,9 +27,10 @@ public class Mandelbrot extends JFrame
     final double bailout = 10000.0;
     final double bailoutLog = Math.log10(bailout);
     final int maxIter = 1 << 18;
-    final int aliasing = 25;
+    final int aliasing = 7;
     final int samples = aliasing * aliasing;
-    final int[][] palette = {{0x00, 0x33, 0x99}, {0xed, 0x1c, 0x16}, {0xff, 0xcc, 0x00}, {0xf5, 0xf5, 0xf1}, {0xa4, 0xc6, 0x39}};
+//    final int[][] palette = {{0x00, 0x33, 0x99}, {0xed, 0x1c, 0x16}, {0xff, 0xcc, 0x00}, {0xf5, 0xf5, 0xf1}, {0xa4, 0xc6, 0x39}};
+    final int[][] palette = {{0xff, 0xff, 0xff}};
     double xCenter, yCenter, radius, gap, miniGap, close, delta;
     boolean julia = false;
     double xJulia, yJulia;
@@ -218,41 +219,47 @@ public class Mandelbrot extends JFrame
             for (int x = 0; x <= aliasing; x++)
             {
                 heightGrid[x][y] = fractal(xLight[x + sx], yLight[y + sy]);
-                System.arraycopy(colorFunction(heightGrid[x][y]), 0, colorsGrid[x][y], 0, 3);
-//                System.arraycopy(new double[]{85.0, 170.0, 255.0}, 0, colorsGrid[x][y], 0, 3);
+                System.arraycopy(colorPalette(heightGrid[x][y]), 0, colorsGrid[x][y], 0, 3);
+//                System.arraycopy(new double[]{255.0, 255.0, 255.0}, 0, colorsGrid[x][y], 0, 3);
             }
 
-        double p = 0.32;
+        double p = 0.3;
         double q = 1.0 - p;
+
+        boolean lighting = true;
+        double light1 = 1.0;
+        double light2 = 1.0;
 
         for (int y = 0; y < aliasing; y++)
             for (int x = 0; x < aliasing; x++)
             {
-                double z1 = heightGrid[x][y];
-                double z2 = heightGrid[x][y + 1];
-                double z3 = heightGrid[x + 1][y + 1];
-                double z4 = heightGrid[x + 1][y];
-
-                double[] t1 = normalize(z1 - z4, z2 - z1, miniGap);
-                double[] t2 = normalize(z2 - z3, z3 - z4, miniGap);
-/*
-                double[] lightDirection = normalize(1.0, 1.0, 1.0);
-
-                double l1 = 0.0;
-                double l2 = 0.0;
-
-                for (int i = 0; i < 3; i++)
+                if (lighting)
                 {
-                    l1 += t1[i] * lightDirection[i];
-                    l2 += t2[i] * lightDirection[i];
-                }
+                    double z1 = heightGrid[x][y];
+                    double z2 = heightGrid[x][y + 1];
+                    double z3 = heightGrid[x + 1][y + 1];
+                    double z4 = heightGrid[x + 1][y];
 
-                double light1 = q + l1 * p;
-                double light2 = q + l2 * p;
+                    double[] t1 = normalize(z1 - z4, z2 - z1, miniGap);
+                    double[] t2 = normalize(z2 - z3, z3 - z4, miniGap);
+/*
+                    double[] lightDirection = normalize(-1.0, 0.0, 0.0);
+
+                    double l1 = 0.0;
+                    double l2 = 0.0;
+
+                    for (int i = 0; i < 3; i++)
+                    {
+                        l1 += t1[i] * lightDirection[i];
+                        l2 += t2[i] * lightDirection[i];
+                    }
+
+                    light1 = q + l1 * p;
+                    light2 = q + l2 * p;
 */
-                double light1 = q + t1[0] * p;
-                double light2 = q + t2[0] * p;
-
+                    light1 = q - t1[0] * p;
+                    light2 = q - t2[0] * p;
+                }
                 for (int i = 0; i < 3; i++)
                 {
                     color[i] += colorsGrid[y][x][i] * light1;
@@ -300,8 +307,8 @@ public class Mandelbrot extends JFrame
 
         z *= speed * Math.PI / 180.0;
 
-        double s = Math.PI / 3.0;
-        for (int i = 0; i < 3; i++) color[i] = 135.0 + 120.0 * Math.sin(z + s * (i - 1));
+        double s = Math.PI / 36.0;
+        for (int i = 0; i < 3; i++) color[i] = 155.0 + 100.0 * Math.sin(z + s * (i - 1));
 
         return color;
     }
