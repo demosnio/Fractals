@@ -17,20 +17,23 @@ import java.util.stream.IntStream;
 
 public class Mandelbrot extends JFrame
 {
-    final int threshold = 200;
+    final int threshold = 100;
 
-    final int width = threshold * 16;
-    final int height = threshold * 9;
+    final int width = threshold * 16 * 2;
+    final int height = threshold * 9 * 2;
     final double ratio = (double) width / (double) height;
     BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
     WritableRaster raster = image.getRaster();
     final double bailout = 10000.0;
     final double bailoutLog = Math.log10(bailout);
     final int maxIter = 1 << 18;
-    final int aliasing = 7;
+    final int aliasing = 4;
     final int samples = aliasing * aliasing;
-//    final int[][] palette = {{0x00, 0x33, 0x99}, {0xed, 0x1c, 0x16}, {0xff, 0xcc, 0x00}, {0xf5, 0xf5, 0xf1}, {0xa4, 0xc6, 0x39}};
-    final int[][] palette = {{0xff, 0xff, 0xff}};
+
+    boolean lighting = true;
+
+    final int[][] palette = {{0x00, 0x33, 0x99}, {0xed, 0x1c, 0x16}, {0xff, 0xcc, 0x00}, {0xf5, 0xf5, 0xf1}, {0xa4, 0xc6, 0x39}};
+    final int[][] white = {{0xff, 0xff, 0xff}};
     double xCenter, yCenter, radius, gap, miniGap, close, delta;
     boolean julia = false;
     double xJulia, yJulia;
@@ -113,8 +116,6 @@ public class Mandelbrot extends JFrame
 
         pool.invoke(new Task(0, 0, width, height, true));
 
-//        gfx.drawImage(image, 0, 0, null);
-
         System.out.println(System.currentTimeMillis() - time);
 
         try
@@ -151,7 +152,7 @@ public class Mandelbrot extends JFrame
             double m = a + b;
 /*
             e += Math.exp(-m);
-            if (m > bailout) return e;
+            if (m > bailout) return e + bailoutLog;
 */
             if (m > bailout) return iter + smoothing(m);
 
@@ -219,16 +220,11 @@ public class Mandelbrot extends JFrame
             for (int x = 0; x <= aliasing; x++)
             {
                 heightGrid[x][y] = fractal(xLight[x + sx], yLight[y + sy]);
-                System.arraycopy(colorPalette(heightGrid[x][y]), 0, colorsGrid[x][y], 0, 3);
-//                System.arraycopy(new double[]{255.0, 255.0, 255.0}, 0, colorsGrid[x][y], 0, 3);
+                System.arraycopy(colorExperiment(heightGrid[x][y]), 0, colorsGrid[x][y], 0, 3);
             }
 
         double p = 0.3;
         double q = 1.0 - p;
-
-        boolean lighting = true;
-        double light1 = 1.0;
-        double light2 = 1.0;
 
         for (int y = 0; y < aliasing; y++)
             for (int x = 0; x < aliasing; x++)
@@ -254,28 +250,124 @@ public class Mandelbrot extends JFrame
                         l2 += t2[i] * lightDirection[i];
                     }
 
-                    light1 = q + l1 * p;
-                    light2 = q + l2 * p;
+                    double light1 = q + l1 * p;
+                    double light2 = q + l2 * p;
 */
-                    light1 = q - t1[0] * p;
-                    light2 = q - t2[0] * p;
-                }
-                for (int i = 0; i < 3; i++)
-                {
-                    color[i] += colorsGrid[y][x][i] * light1;
-                    color[i] += colorsGrid[y][x + 1][i] * light1;
-                    color[i] += colorsGrid[y + 1][x][i] * light1;
+                    double light1 = q - t1[0] * p;
+                    double light2 = q - t2[0] * p;
 
-                    color[i] += colorsGrid[y][x + 1][i] * light2;
-                    color[i] += colorsGrid[y + 1][x + 1][i] * light2;
-                    color[i] += colorsGrid[y + 1][x][i] * light2;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        color[i] += light1 * colorsGrid[x][y][i];
+                        color[i] += light1 * colorsGrid[x][y + 1][i];
+                        color[i] += light1 * colorsGrid[x + 1][y][i];
+
+                        color[i] += light2 * colorsGrid[x][y + 1][i];
+                        color[i] += light2 * colorsGrid[x + 1][y + 1][i];
+                        color[i] += light2 * colorsGrid[x + 1][y][i];
+                    }
                 }
+                else
+                    for (int i = 0; i < 3; i++)
+                    {
+                        color[i] += colorsGrid[x][y][i];
+                        color[i] += colorsGrid[x][y + 1][i];
+                        color[i] += colorsGrid[x + 1][y][i];
+
+                        color[i] += colorsGrid[x][y + 1][i];
+                        color[i] += colorsGrid[x + 1][y + 1][i];
+                        color[i] += colorsGrid[x + 1][y][i];
+                    }
             }
 
         for (int i = 0; i < 3; i++)
             color[i] /= (aliasing) * (aliasing) * 6;
 
         return color;
+    }
+
+    private double[] lightArea(int px, int py, int width, int height)
+    {
+        double[] colors = new double[width * height * 3];
+
+        int sx = px * aliasing;
+        int sy = py * aliasing;
+
+        int xPoints = width * aliasing;
+        int yPoints = height * aliasing;
+
+        double[][] heightGrid = new double[1 + xPoints][1 + yPoints];
+        double[][][] colorsGrid = new double[1 + xPoints][1 + yPoints][3];
+
+        IntStream.rangeClosed(0, yPoints).forEach(y -> IntStream.rangeClosed(0, xPoints).forEach(x -> {
+            heightGrid[x][y] = fractal(xLight[x + sx], yLight[y + sy]);
+            System.arraycopy(colorExperiment(heightGrid[x][y]), 0, colorsGrid[x][y], 0, 3);
+        }));
+
+/*
+        for (int y = 0; y <= yPoints; y++)
+            for (int x = 0; x <= xPoints; x++)
+            {
+                heightGrid[x][y] = fractal(xLight[x + sx], yLight[y + sy]);
+                System.arraycopy(colorExperiment(heightGrid[x][y]), 0, colorsGrid[x][y], 0, 3);
+            }
+*/
+
+        double p = 0.3;
+        double q = 1.0 - p;
+
+        int index = 0;
+        for (int h = 0; h < yPoints; h += aliasing)
+            for (int w = 0; w < xPoints; w += aliasing)
+            {
+                double[] color = new double[]{0.0, 0.0, 0.0};
+                for (int y = 0; y < aliasing; y++)
+                    for (int x = 0; x < aliasing; x++)
+                    {
+                        if (lighting)
+                        {
+                            double z1 = heightGrid[w + x][h + y];
+                            double z2 = heightGrid[w + x][h + y + 1];
+                            double z3 = heightGrid[w + x + 1][h + y + 1];
+                            double z4 = heightGrid[w + x + 1][h + y];
+
+                            double[] t1 = normalize(z1 - z4, z2 - z1, miniGap);
+                            double[] t2 = normalize(z2 - z3, z3 - z4, miniGap);
+
+                            double light1 = q - t1[0] * p;
+                            double light2 = q - t2[0] * p;
+
+                            for (int i = 0; i < 3; i++)
+                            {
+                                color[i] += light1 * colorsGrid[w + x][h + y][i];
+                                color[i] += light1 * colorsGrid[w + x][h + y + 1][i];
+                                color[i] += light1 * colorsGrid[w + x + 1][h + y][i];
+
+                                color[i] += light2 * colorsGrid[w + x][h + y + 1][i];
+                                color[i] += light2 * colorsGrid[w + x + 1][h + y + 1][i];
+                                color[i] += light2 * colorsGrid[w + x + 1][h + y][i];
+                            }
+                        }
+                        else
+                            for (int i = 0; i < 3; i++)
+                            {
+                                color[i] += colorsGrid[w + x][h + y][i];
+                                color[i] += colorsGrid[w + x][h + y + 1][i];
+                                color[i] += colorsGrid[w + x + 1][h + y][i];
+
+                                color[i] += colorsGrid[w + x][h + y + 1][i];
+                                color[i] += colorsGrid[w + x + 1][h + y + 1][i];
+                                color[i] += colorsGrid[w + x + 1][h + y][i];
+                            }
+                    }
+
+                for (int i = 0; i < 3; i++)
+                {
+                    color[i] /= (aliasing) * (aliasing) * 6;
+                    colors[index++] = color[i];
+                }
+            }
+        return colors;
     }
 
     private double[] colorPalette(double z)
@@ -299,7 +391,7 @@ public class Mandelbrot extends JFrame
 
     private double[] colorFunction(double z)
     {
-        double[] color = {1.0, 0.0, 0.0};
+        double[] color = {0.0, 0.0, 0.0};
 
         if (z < 0.0) return color;
 
@@ -307,8 +399,26 @@ public class Mandelbrot extends JFrame
 
         z *= speed * Math.PI / 180.0;
 
-        double s = Math.PI / 36.0;
+        double s = Math.PI / 4.0;
         for (int i = 0; i < 3; i++) color[i] = 155.0 + 100.0 * Math.sin(z + s * (i - 1));
+
+        return color;
+    }
+
+    private double[] colorExperiment(double z)
+    {
+        double[] color = {0.0, 0.0, 0.0};
+
+        if (z <= 1.0) return color;
+
+        double[] color1 = {0x00, 0xbf, 0xff}; // deepskyblue
+        double[] color2 = {0xff, 0x14, 0x93}; // deeppink
+
+        double t = Math.log10(z) / Math.log10(maxIter);
+
+        if (t > 0.5) return color2;
+
+        for (int i = 0; i < 3; i++) color[i] = color1[i] + 2.0 * t * (color2[i] - color1[i]);
 
         return color;
     }
@@ -334,22 +444,18 @@ public class Mandelbrot extends JFrame
             {
                 List<Task> tasks = new ArrayList<>();
 
-                for (int w = 0; w < width; w += threshold)
-                    for (int h = 0; h < height; h += threshold)
+                for (int h = 0; h < height; h += threshold)
+                    for (int w = 0; w < width; w += threshold)
                         tasks.add(new Task(w, h, threshold, threshold, false));
 
                 invokeAll(tasks);
             }
             else
             {
-                computeArea();
+//                IntStream.range(x, x + width).forEach(p -> IntStream.range(y, y + height).forEach(q -> raster.setPixel(p, q, lightPixel(p, q))));
+                raster.setPixels(x, y, width, height, lightArea(x, y, width, height));
+                gfx.drawImage(image, 0, 0, null);
             }
-        }
-
-        private void computeArea()
-        {
-            IntStream.range(x, x + width).forEach(p -> IntStream.range(y, y + height).forEach(q -> raster.setPixel(p, q, lightPixel(p, q))));
-            gfx.drawImage(image, 0, 0, null);
         }
     }
 }
