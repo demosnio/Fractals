@@ -17,29 +17,34 @@ import java.util.stream.IntStream;
 
 public class Mandelbrot extends JFrame
 {
-    final int threshold = 100;
+    final int threshold = 120;
 
     final int width = threshold * 16 * 2;
     final int height = threshold * 9 * 2;
     final double ratio = (double) width / (double) height;
+
     BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
     WritableRaster raster = image.getRaster();
+
     final double bailout = 10000.0;
     final double bailoutLog = Math.log10(bailout);
-    final int maxIter = 1 << 18;
-    final int aliasing = 4;
-    final int samples = aliasing * aliasing;
 
-    boolean lighting = true;
+    final int maxIter = 1 << 18;
+    final double maxIterLog = Math.log10(maxIter);
+
+    final int aliasing = 3;
+
+    boolean lightOn = true;
 
     final int[][] palette = {{0x00, 0x33, 0x99}, {0xed, 0x1c, 0x16}, {0xff, 0xcc, 0x00}, {0xf5, 0xf5, 0xf1}, {0xa4, 0xc6, 0x39}};
     final int[][] white = {{0xff, 0xff, 0xff}};
-    double xCenter, yCenter, radius, gap, miniGap, close, delta;
+
+    double xCenter, yCenter, radius, gap, miniGap, close;
     boolean julia = false;
     double xJulia, yJulia;
+
     Graphics gfx;
-    double[] xPixel;
-    double[] yPixel;
+
     double[] xLight;
     double[] yLight;
 
@@ -99,12 +104,7 @@ public class Mandelbrot extends JFrame
         miniGap = gap / aliasing;
         close = Math.pow(miniGap / 3.0, 2.0);
 
-        delta = (gap - miniGap) / 2.0;
-
-        xPixel = mapping(xCenter - radius * ratio - delta, xCenter + radius * ratio + delta, width * aliasing);
-        yPixel = mapping(yCenter + radius + delta, yCenter - radius - delta, height * aliasing);
-
-        delta = gap / 2.0;
+        double delta = gap / 2.0;
 
         xLight = mapping(xCenter - radius * ratio - delta, xCenter + radius * ratio + delta, 1 + width * aliasing);
         yLight = mapping(yCenter + radius + delta, yCenter - radius - delta, 1 + height * aliasing);
@@ -180,110 +180,17 @@ public class Mandelbrot extends JFrame
         return bailoutLog - Math.log(Math.log(modulus)) / Math.log(2.0);
     }
 
-    private double[] superPixel(int px, int py)
+    private double lighting(double za, double zb, double zc)
     {
-        double[] color = new double[]{0.0, 0.0, 0.0};
-
-        int sx = px * aliasing;
-        int sy = py * aliasing;
-
-        for (int y = sy; y < sy + aliasing; y++)
-            for (int x = sx; x < sx + aliasing; x++)
-            {
-                double[] k = colorPalette(fractal(xPixel[x], yPixel[y]));
-                for (int i = 0; i < 3; i++) color[i] += k[i];
-            }
-
-        for (int i = 0; i < 3; i++) color[i] /= samples;
-
-        return color;
-    }
-
-    private double[] normalize(double x, double y, double z)
-    {
-        double m = Math.sqrt(x * x + y * y + z * z);
-
-        return new double[]{x / m, y / m, z / m};
-    }
-
-    private double[] lightPixel(int px, int py)
-    {
-        double[] color = new double[]{0.0, 0.0, 0.0};
-
-        int sx = px * aliasing;
-        int sy = py * aliasing;
-
-        double[][] heightGrid = new double[1 + aliasing][1 + aliasing];
-        double[][][] colorsGrid = new double[1 + aliasing][1 + aliasing][3];
-
-        for (int y = 0; y <= aliasing; y++)
-            for (int x = 0; x <= aliasing; x++)
-            {
-                heightGrid[x][y] = fractal(xLight[x + sx], yLight[y + sy]);
-                System.arraycopy(colorExperiment(heightGrid[x][y]), 0, colorsGrid[x][y], 0, 3);
-            }
-
         double p = 0.3;
         double q = 1.0 - p;
 
-        for (int y = 0; y < aliasing; y++)
-            for (int x = 0; x < aliasing; x++)
-            {
-                if (lighting)
-                {
-                    double z1 = heightGrid[x][y];
-                    double z2 = heightGrid[x][y + 1];
-                    double z3 = heightGrid[x + 1][y + 1];
-                    double z4 = heightGrid[x + 1][y];
+        double x = za - zc;
+        double y = zb - za;
 
-                    double[] t1 = normalize(z1 - z4, z2 - z1, miniGap);
-                    double[] t2 = normalize(z2 - z3, z3 - z4, miniGap);
-/*
-                    double[] lightDirection = normalize(-1.0, 0.0, 0.0);
+        double m = Math.sqrt(x * x + y * y + miniGap * miniGap);
 
-                    double l1 = 0.0;
-                    double l2 = 0.0;
-
-                    for (int i = 0; i < 3; i++)
-                    {
-                        l1 += t1[i] * lightDirection[i];
-                        l2 += t2[i] * lightDirection[i];
-                    }
-
-                    double light1 = q + l1 * p;
-                    double light2 = q + l2 * p;
-*/
-                    double light1 = q - t1[0] * p;
-                    double light2 = q - t2[0] * p;
-
-                    for (int i = 0; i < 3; i++)
-                    {
-                        color[i] += light1 * colorsGrid[x][y][i];
-                        color[i] += light1 * colorsGrid[x][y + 1][i];
-                        color[i] += light1 * colorsGrid[x + 1][y][i];
-
-                        color[i] += light2 * colorsGrid[x][y + 1][i];
-                        color[i] += light2 * colorsGrid[x + 1][y + 1][i];
-                        color[i] += light2 * colorsGrid[x + 1][y][i];
-                    }
-                }
-                else
-                    for (int i = 0; i < 3; i++)
-                    {
-                        color[i] += colorsGrid[x][y][i];
-                        color[i] += colorsGrid[x][y + 1][i];
-                        color[i] += colorsGrid[x + 1][y][i];
-
-                        color[i] += colorsGrid[x][y + 1][i];
-                        color[i] += colorsGrid[x + 1][y + 1][i];
-                        color[i] += colorsGrid[x + 1][y][i];
-                    }
-            }
-
-        for (int i = 0; i < 3; i++)
-            color[i] /= (aliasing) * (aliasing) * 6;
-
-        return color;
+        return q - (x / m) * p;
     }
 
     private double[] lightArea(int px, int py, int width, int height)
@@ -297,21 +204,15 @@ public class Mandelbrot extends JFrame
         int yPoints = height * aliasing;
 
         double[][] heightGrid = new double[1 + xPoints][1 + yPoints];
-        double[][][] colorsGrid = new double[1 + xPoints][1 + yPoints][3];
+        Color[][] colorsGrid = new Color[1 + xPoints][1 + yPoints];
 
-        IntStream.rangeClosed(0, yPoints).forEach(y -> IntStream.rangeClosed(0, xPoints).forEach(x -> {
+        IntStream.rangeClosed(0, yPoints).forEach(y -> IntStream.rangeClosed(0, xPoints).forEach(x ->
+        {
             heightGrid[x][y] = fractal(xLight[x + sx], yLight[y + sy]);
-            System.arraycopy(colorExperiment(heightGrid[x][y]), 0, colorsGrid[x][y], 0, 3);
+            colorsGrid[x][y] = colorExperiment(heightGrid[x][y]);
         }));
 
-/*
-        for (int y = 0; y <= yPoints; y++)
-            for (int x = 0; x <= xPoints; x++)
-            {
-                heightGrid[x][y] = fractal(xLight[x + sx], yLight[y + sy]);
-                System.arraycopy(colorExperiment(heightGrid[x][y]), 0, colorsGrid[x][y], 0, 3);
-            }
-*/
+        Arrow lightDirection = Arrow.normalize(new Arrow(1.0, 0.0, 0.0));
 
         double p = 0.3;
         double q = 1.0 - p;
@@ -320,59 +221,87 @@ public class Mandelbrot extends JFrame
         for (int h = 0; h < yPoints; h += aliasing)
             for (int w = 0; w < xPoints; w += aliasing)
             {
-                double[] color = new double[]{0.0, 0.0, 0.0};
+                Color color = new Color();
                 for (int y = 0; y < aliasing; y++)
                     for (int x = 0; x < aliasing; x++)
                     {
-                        if (lighting)
+                        if (lightOn)
                         {
                             double z1 = heightGrid[w + x][h + y];
                             double z2 = heightGrid[w + x][h + y + 1];
                             double z3 = heightGrid[w + x + 1][h + y + 1];
                             double z4 = heightGrid[w + x + 1][h + y];
+/*
+                            double light1 = lighting(z1, z2, z4);
+                            double light2 = lighting(z2, z4, z3);
 
-                            double[] t1 = normalize(z1 - z4, z2 - z1, miniGap);
-                            double[] t2 = normalize(z2 - z3, z3 - z4, miniGap);
+                            color = Color.add(color, Color.times(light1, colorsGrid[w + x][h + y]));
+                            color = Color.add(color, Color.times(light1, colorsGrid[w + x][h + y + 1]));
+                            color = Color.add(color, Color.times(light1, colorsGrid[w + x + 1][h + y]));
 
-                            double light1 = q - t1[0] * p;
-                            double light2 = q - t2[0] * p;
+                            color = Color.add(color, Color.times(light2, colorsGrid[w + x][h + y + 1]));
+                            color = Color.add(color, Color.times(light2, colorsGrid[w + x + 1][h + y + 1]));
+                            color = Color.add(color, Color.times(light2, colorsGrid[w + x + 1][h + y]));
+*/
+                            Arrow a1 = new Arrow(miniGap, 0.0, z4 - z1);
+                            Arrow b1 = new Arrow(0.0, -miniGap, z2 - z1);
 
-                            for (int i = 0; i < 3; i++)
-                            {
-                                color[i] += light1 * colorsGrid[w + x][h + y][i];
-                                color[i] += light1 * colorsGrid[w + x][h + y + 1][i];
-                                color[i] += light1 * colorsGrid[w + x + 1][h + y][i];
+                            Arrow k1 = Arrow.normalize(Arrow.product(a1, b1));
 
-                                color[i] += light2 * colorsGrid[w + x][h + y + 1][i];
-                                color[i] += light2 * colorsGrid[w + x + 1][h + y + 1][i];
-                                color[i] += light2 * colorsGrid[w + x + 1][h + y][i];
-                            }
+                            double light1 = q + p * Arrow.dot(k1, lightDirection);
+
+                            color = Color.add(color, Color.times(light1, colorsGrid[w + x][h + y]));
+
+                            Arrow a2 = new Arrow(0.0, miniGap, z1 - z2);
+                            Arrow b2 = new Arrow(miniGap, 0.0, z3 - z2);
+
+                            Arrow k2 = Arrow.normalize(Arrow.product(a2, b2));
+
+                            double light2 = q + p * Arrow.dot(k2, lightDirection);
+
+                            color = Color.add(color, Color.times(light2, colorsGrid[w + x][h + y + 1]));
+
+                            Arrow a3 = new Arrow(-miniGap, 0.0, z2 - z3);
+                            Arrow b3 = new Arrow(0.0, miniGap, z4 - z3);
+
+                            Arrow k3 = Arrow.normalize(Arrow.product(a3, b3));
+
+                            double light3 = q + p * Arrow.dot(k3, lightDirection);
+
+                            color = Color.add(color, Color.times(light3, colorsGrid[w + x + 1][h + y + 1]));
+
+                            Arrow a4 = new Arrow(0.0, -miniGap, z3 - z4);
+                            Arrow b4 = new Arrow(-miniGap, 0.0, z1 - z4);
+
+                            Arrow k4 = Arrow.normalize(Arrow.product(a4, b4));
+
+                            double light4 = q + p * Arrow.dot(k4, lightDirection);
+
+                            color = Color.add(color, Color.times(light4, colorsGrid[w + x + 1][h + y]));
                         }
                         else
-                            for (int i = 0; i < 3; i++)
-                            {
-                                color[i] += colorsGrid[w + x][h + y][i];
-                                color[i] += colorsGrid[w + x][h + y + 1][i];
-                                color[i] += colorsGrid[w + x + 1][h + y][i];
+                        {
+                            color = Color.add(color, colorsGrid[w + x][h + y]);
+                            color = Color.add(color, colorsGrid[w + x][h + y + 1]);
+                            color = Color.add(color, colorsGrid[w + x + 1][h + y]);
 
-                                color[i] += colorsGrid[w + x][h + y + 1][i];
-                                color[i] += colorsGrid[w + x + 1][h + y + 1][i];
-                                color[i] += colorsGrid[w + x + 1][h + y][i];
-                            }
+                            color = Color.add(color, colorsGrid[w + x][h + y + 1]);
+                            color = Color.add(color, colorsGrid[w + x + 1][h + y + 1]);
+                            color = Color.add(color, colorsGrid[w + x + 1][h + y]);
+                        }
                     }
 
-                for (int i = 0; i < 3; i++)
-                {
-                    color[i] /= (aliasing) * (aliasing) * 6;
-                    colors[index++] = color[i];
-                }
+                color = Color.times(1.0 / (aliasing * aliasing * 4), color);
+                colors[index++] = color.r;
+                colors[index++] = color.g;
+                colors[index++] = color.b;
             }
         return colors;
     }
 
-    private double[] colorPalette(double z)
+    private Color colorPalette(double z)
     {
-        double[] color = {0.0, 0.0, 0.0};
+        Color color = new Color();
 
         if (z < 0.0) return color;
 
@@ -384,14 +313,17 @@ public class Mandelbrot extends JFrame
         z -= t;
         t = t % palette.length;
         int s = (t + 1) % palette.length;
-        for (int i = 0; i < 3; i++) color[i] = palette[t][i] + z * (palette[s][i] - palette[t][i]);
+
+        color.r = palette[t][0] + z * (palette[s][0] - palette[t][0]);
+        color.g = palette[t][1] + z * (palette[s][1] - palette[t][1]);
+        color.b = palette[t][2] + z * (palette[s][2] - palette[t][2]);
 
         return color;
     }
 
-    private double[] colorFunction(double z)
+    private Color colorFunction(double z)
     {
-        double[] color = {0.0, 0.0, 0.0};
+        Color color = new Color();
 
         if (z < 0.0) return color;
 
@@ -400,25 +332,28 @@ public class Mandelbrot extends JFrame
         z *= speed * Math.PI / 180.0;
 
         double s = Math.PI / 4.0;
-        for (int i = 0; i < 3; i++) color[i] = 155.0 + 100.0 * Math.sin(z + s * (i - 1));
+
+        color.r = 155.0 + 100.0 * Math.sin(z - s);
+        color.g = 155.0 + 100.0 * Math.sin(z);
+        color.b = 155.0 + 100.0 * Math.sin(z + s);
 
         return color;
     }
 
-    private double[] colorExperiment(double z)
+    private Color colorExperiment(double z)
     {
-        double[] color = {0.0, 0.0, 0.0};
+        Color color = new Color();
 
         if (z <= 1.0) return color;
 
-        double[] color1 = {0x00, 0xbf, 0xff}; // deepskyblue
-        double[] color2 = {0xff, 0x14, 0x93}; // deeppink
+        Color color1 = new Color(0x00, 0xbf, 0xff); // deepskyblue
+        Color color2 = new Color(0xff, 0x14, 0x93); // deeppink
 
-        double t = Math.log10(z) / Math.log10(maxIter);
+        double t = Math.log10(z) / maxIterLog;
 
         if (t > 0.5) return color2;
 
-        for (int i = 0; i < 3; i++) color[i] = color1[i] + 2.0 * t * (color2[i] - color1[i]);
+        color = Color.add(color1, Color.times(t + t, Color.sub(color2, color1)));
 
         return color;
     }
@@ -452,7 +387,6 @@ public class Mandelbrot extends JFrame
             }
             else
             {
-//                IntStream.range(x, x + width).forEach(p -> IntStream.range(y, y + height).forEach(q -> raster.setPixel(p, q, lightPixel(p, q))));
                 raster.setPixels(x, y, width, height, lightArea(x, y, width, height));
                 gfx.drawImage(image, 0, 0, null);
             }
