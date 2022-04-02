@@ -13,11 +13,16 @@ public class Arrow
 
     static Arrow product(Arrow a, Arrow b)
     {
-        double x = a.y * b.z - b.y * a.z;
-        double y = a.x * b.z - b.x * a.z;
-        double z = a.x * b.y - b.x * a.y;
+        double x = a.y * b.z - a.z * b.y;
+        double y = a.z * b.x - a.x * b.z;
+        double z = a.x * b.y - a.y * b.x;
 
         return new Arrow(x, y, z);
+    }
+
+    static Arrow sub(Arrow a, Arrow b)
+    {
+        return new Arrow(a.x - b.x, a.y - b.y, a.z - b.z);
     }
 
     static Arrow normalize(Arrow a)
@@ -31,4 +36,6 @@ public class Arrow
     {
         return a.x * b.x + a.y * b.y + a.z * b.z;
     }
+
+
 }

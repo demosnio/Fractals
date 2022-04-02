@@ -36,6 +36,6 @@ public class Color
     @Override
     public String toString()
     {
-        return "Color{" + "r=" + r + ", g=" + g + ", b=" + b + "}";
+        return String.format("(r = %.4g | g = %.4g | b = %.4g)", r, g, b);
     }
 }
