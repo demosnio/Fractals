@@ -17,10 +17,10 @@ import java.util.stream.IntStream;
 
 public class Mandelbrot extends JFrame
 {
-    final int threshold = 120;
+    int threshold = 160;
 
-    final int width = threshold * 16 << 1;
-    final int height = threshold * 9 << 1;
+    int width = threshold * 16;
+    int height = threshold * 9;
     final double ratio = (double) width / (double) height;
 
     BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -81,11 +81,22 @@ public class Mandelbrot extends JFrame
         setLayout(null);
         getContentPane().setPreferredSize(new Dimension(width, height));
         pack();
+
         Dimension s = Toolkit.getDefaultToolkit().getScreenSize();
         setLocation(((int) s.getWidth() - getWidth()) / 2, ((int) s.getHeight() - getHeight()) / 2);
-        setVisible(true);
-
         gfx = getContentPane().getGraphics();
+/*
+        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        GraphicsDevice device = ge.getDefaultScreenDevice();
+
+        device.setFullScreenWindow(this);
+
+        width = getWidth();
+        height = getHeight();
+
+        gfx = getGraphics();
+*/
+        setVisible(true);
     }
 
     private String getFilename()
@@ -191,7 +202,7 @@ public class Mandelbrot extends JFrame
         IntStream.rangeClosed(0, yPoints).forEach(y -> IntStream.rangeClosed(0, xPoints).forEach(x ->
         {
             heightGrid[x][y] = fractal(xLight[x + sx], yLight[y + sy]);
-            colorsGrid[x][y] = colorPalette(heightGrid[x][y]);
+            colorsGrid[x][y] = colorExperiment(heightGrid[x][y]);
         }));
 
         double p = 0.3;
